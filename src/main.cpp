@@ -20,13 +20,14 @@ static char serial_buffer[SerialBufferSize];
 static size_t serial_buffer_len = 0;
 
 void sendMotor(int motor) {
-	if (oscPosition[motor] == serialPosition[motor]) return;
+	int oscPos = oscPosition[motor];
+	if (oscPos == serialPosition[motor]) return;
 	String motorName = "motor"+String(motor+1);
 	int speed = config[motorName+"/speed"].as<int>();
 	int acc = config[motorName+"/acceleration"].as<int>();
 	Serial1.print(motor+1);
 	Serial1.print(" ");
-	Serial1.print(oscPosition[motor]);
+	Serial1.print(oscPos);
 	Serial1.print(" ");
 	Serial1.print(speed);
 	Serial1.print(" ");
@@ -38,7 +39,7 @@ void sendMotor(int motor) {
 	// Serial.print(speed);
 	// Serial.print(" ");
 	// Serial.println(acc);
-	serialPosition[motor] = oscPosition[motor];
+	serialPosition[motor] = oscPos;
 }
 
 void setMotor(int motor, float to) {
