@@ -19,26 +19,33 @@ static constexpr size_t SerialBufferSize = 64;
 static char serial_buffer[SerialBufferSize];
 static size_t serial_buffer_len = 0;
 
+uint16_t crc16(const String& str)
+{
+    uint16_t crc = 0xFFFF;
+
+    for (size_t i = 0; i < str.length(); i++)
+    {
+        crc ^= (uint8_t)str[i] << 8;
+        for (uint8_t j = 0; j < 8; j++)
+        {
+            if (crc & 0x8000)
+                crc = (crc << 1) ^ 0x1021;
+            else
+                crc <<= 1;
+        }
+    }
+    return crc;
+}
+
 void sendMotor(int motor) {
 	int oscPos = oscPosition[motor];
 	if (oscPos == serialPosition[motor]) return;
 	String motorName = "motor"+String(motor+1);
 	int speed = config[motorName+"/speed"].as<int>();
 	int acc = config[motorName+"/acceleration"].as<int>();
-	Serial1.print(motor+1);
-	Serial1.print(" ");
-	Serial1.print(oscPos);
-	Serial1.print(" ");
-	Serial1.print(speed);
-	Serial1.print(" ");
-	Serial1.println(acc);
-	// Serial.print(motor+1);
-	// Serial.print(" ");
-	// Serial.print(oscPosition[motor]);
-	// Serial.print(" ");
-	// Serial.print(speed);
-	// Serial.print(" ");
-	// Serial.println(acc);
+	String send = String(motor+1) + " " + String(oscPos) + " " + String(speed) + " " + String(acc);
+	String frame = send + "*" + String(crc16(send), HEX);
+	Serial1.println(frame);
 	serialPosition[motor] = oscPos;
 }
 
@@ -86,13 +93,13 @@ void setup() {
 	setupWebServer();
 
 	for (int i = 0; i < nMotors; i++) {
-		OscWiFi.getServer(oscPort).subscribe("/motor" + String(i+1) + "", [i](const OscMessage& m){
+		oscSubscribe("/motor" + String(i+1) + "", [i](const OscMessage& m){
 			if (m.size()>0) {
 				setMotor(i, m.getArgAsFloat(0));
 			}
 		}); 
 	}
-	OscWiFi.getServer(oscPort).subscribe("/serial", [](const OscMessage& m){
+	oscSubscribe("/serial", [](const OscMessage& m){
 		if (m.size()>0) {
 			Serial1.println(m.getArgAsString(0));
 		}
