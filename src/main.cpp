@@ -14,6 +14,8 @@
 const int nMotors = 10;
 int oscPosition[nMotors];
 int serialPosition[nMotors];
+int inflate[nMotors];
+int deflate[nMotors];
 
 static constexpr size_t SerialBufferSize = 64;
 static char serial_buffer[SerialBufferSize];
@@ -77,6 +79,8 @@ void setup() {
 	for (int i = 0; i < nMotors; i++) {
 		oscPosition[i] = 0;
 		serialPosition[i] = 0;
+		inflate[i] = false;
+		deflate[i] = false;
 		addIntConfig("motor" + String(i+1) + "/maxPosition", 4000);
 		addIntConfig("motor" + String(i+1) + "/speed", 4000);
 		addIntConfig("motor" + String(i+1) + "/acceleration", 4000);
@@ -85,7 +89,7 @@ void setup() {
 
 
 	Serial.begin(115200);
-	Serial1.begin(115200);
+	Serial1.begin(921600);
 	initConfig();
 	setupEthernet();
 	setupWifi();
@@ -98,7 +102,14 @@ void setup() {
 				setMotor(i, m.getArgAsFloat(0));
 			}
 		}); 
+		oscSubscribe("/inflate" + String(i+1) + "", [i](const OscMessage& m){
+			inflate[i] = true;
+		}); 
+		oscSubscribe("/deflate" + String(i+1) + "", [i](const OscMessage& m){
+			deflate[i] = true;
+		}); 
 	}
+
 	oscSubscribe("/serial", [](const OscMessage& m){
 		if (m.size()>0) {
 			Serial1.println(m.getArgAsString(0));
@@ -111,8 +122,21 @@ void setup() {
 }
 
 void loop()
-{
+{	
 	for (int i = 0; i< nMotors; i++) {
+		if (inflate[i]) {
+			inflate[i] = false;
+			int max = config["motor" + String(i+1) + "/maxPosition"].as<int>() + 2500;
+			Serial.println("new max " + String(max));
+			writeConfig("motor" + String(i+1) + "/maxPosition", max);
+			setMotor(i, 1.0f);
+		} 
+		if (deflate[i]) {
+			deflate[i] = false;
+			int max = config["motor" + String(i+1) + "/maxPosition"].as<int>() - 2500;
+			writeConfig("motor" + String(i+1) + "/maxPosition", max);
+			setMotor(i, 1.0f);
+		}
 		sendMotor(i);
 	}
     vTaskDelay(pdMS_TO_TICKS(200));
